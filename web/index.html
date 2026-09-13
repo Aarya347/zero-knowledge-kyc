@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>zk-KYC Issuer Service</title>
+  <link rel="stylesheet" href="./src/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>zk-KYC Issuer <span class="brand-badge">PLONK v1</span></h1>
+          <p class="brand-tagline">Privacy-preserving age credential issuance</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- System Health Pill -->
+        <button id="btn-toggle-health" class="health-pill" title="Click to view issuer capability status">
+          <span id="global-status-dot" class="status-dot"></span>
+          <span id="global-status-text">Checking Issuer...</span>
+        </button>
+
+        <!-- Config Toggle -->
+        <button id="btn-toggle-config" class="btn-icon" title="Configure Issuer API Endpoint">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Config Drawer -->
+    <div id="config-drawer" class="config-bar hidden">
+      <div class="config-input-group">
+        <label for="api-base-url">Issuer API URL:</label>
+        <input type="text" id="api-base-url" value="http://127.0.0.1:8000" placeholder="http://127.0.0.1:8000">
+      </div>
+      <button id="btn-save-config" class="btn-secondary btn-sm">Save & Reconnect</button>
+    </div>
+
+    <!-- Health Details Panel -->
+    <div id="health-panel" class="health-panel hidden">
+      <div class="health-panel-header">
+        <div class="health-panel-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          Issuer Service Health (/healthz)
+        </div>
+        <button id="btn-refresh-health" class="btn-secondary btn-sm">
+          Refresh
+        </button>
+      </div>
+
+      <div class="health-grid">
+        <div class="health-item">
+          <span class="health-item-name">Passive Liveness</span>
+          <span id="health-passive" class="health-item-status">--</span>
+        </div>
+        <div class="health-item">
+          <span class="health-item-name">Document Presence (OCR)</span>
+          <span id="health-doc" class="health-item-status">--</span>
+        </div>
+        <div class="health-item">
+          <span class="health-item-name">Head Turn (OpenCV)</span>
+          <span id="health-head" class="health-item-status">--</span>
+        </div>
+        <div class="health-item">
+          <span class="health-item-name">Speech Model (Vosk)</span>
+          <span id="health-speech" class="health-item-status">--</span>
+        </div>
+        <div class="health-item">
+          <span class="health-item-name">EdDSA Signer</span>
+          <span id="health-signer" class="health-item-status">--</span>
+        </div>
+      </div>
+
+      <div id="issuance-banner" class="issuance-status-banner possible">
+        <span id="issuance-banner-text">Evaluating issuer capability...</span>
+      </div>
+    </div>
+
+    <!-- MAIN APP FLOW SCREENS -->
+
+    <!-- SCREEN 1: START SCREEN -->
+    <main id="screen-start" class="card hero-card fade-in">
+      <div class="hero-shield">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M12 8v4"/>
+          <path d="M12 16h.01"/>
+        </svg>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; align-items: center;">
+        <h2 class="hero-title">Zero-Knowledge Identity Verification</h2>
+        <p class="hero-desc">
+          Verify live human presence and physical document presentation to obtain a cryptographic EdDSA age credential. Media is evaluated and discarded immediately.
+        </p>
+      </div>
+
+      <div class="feature-pills">
+        <div class="feature-pill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          MiniFASNet Anti-Spoofing
+        </div>
+        <div class="feature-pill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h10v10H7z"/></svg>
+          Live Document Presence Check
+        </div>
+        <div class="feature-pill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+          Zero Biometrics in Credential
+        </div>
+      </div>
+
+      <button id="btn-begin-verification" class="btn-primary btn-lg">
+        <span>Begin Verification</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </main>
+
+    <!-- SCREEN 2: CAPTURE SCREEN -->
+    <main id="screen-capture" class="card capture-layout hidden">
+      <!-- Challenge Banner -->
+      <section class="challenge-banner">
+        <div class="challenge-top">
+          <div class="challenge-label-row">
+            <span class="challenge-badge">Active Verification Challenge</span>
+            <span id="session-id-display" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary);">Session: ...</span>
+          </div>
+          <div id="session-timer-pill" class="session-expiry-pill">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span id="session-timer-text">Expires in: 05:00</span>
+          </div>
+        </div>
+
+        <div id="challenge-prompt" class="challenge-prompt-text">
+          Loading challenge...
+        </div>
+
+        <!-- Dynamic Challenge UI 1: Head Turn -->
+        <div id="head-turn-widget" class="head-turn-indicator hidden">
+          <div class="direction-cue-box">
+            <span id="head-turn-direction">TURN LEFT</span>
+            <span id="head-turn-arrow" class="arrow-pulse">→</span>
+          </div>
+          <div class="head-turn-animation">
+            <span>Slowly rotate your head toward the indicated direction, then return to center.</span>
+          </div>
+        </div>
+
+        <!-- Dynamic Challenge UI 2: Speak Digits -->
+        <div id="speech-widget" class="speech-challenge-box hidden">
+          <div id="digits-container" class="speech-digits-row">
+            <!-- Digits dynamically inserted -->
+          </div>
+          <div class="audio-meter-container">
+            <span class="audio-meter-label">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" x2="12" y1="19" y2="22"></line>
+              </svg>
+              Microphone Level:
+            </span>
+            <div class="audio-bar-wrapper">
+              <div id="audio-bar-fill" class="audio-bar-fill"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Two-Column Capture Area -->
+      <div class="capture-grid">
+        <!-- Section 1: ID Photo -->
+        <section class="capture-section-card">
+          <div class="section-card-title">
+            <span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
+              </svg>
+              Step 1: ID Card Photo
+            </span>
+            <span id="id-status-badge" class="step-indicator-badge">Required</span>
+          </div>
+
+          <!-- Dropzone -->
+          <div id="id-dropzone" class="dropzone">
+            <div class="dropzone-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
+            <div class="dropzone-text">Click or drag & drop ID photo</div>
+            <div class="dropzone-subtext">JPG or PNG with clear frontal ID & legible DOB</div>
+            <input type="file" id="id-file-input" accept="image/jpeg,image/png,image/jpg" style="display: none;">
+          </div>
+
+          <!-- Photo Preview -->
+          <div id="id-preview-box" class="photo-preview-box hidden">
+            <img id="id-preview-img" class="photo-preview-img" alt="ID Photo Preview">
+            <div class="photo-meta-row">
+              <span id="photo-filename" style="font-family: var(--font-mono);">id_photo.jpg</span>
+              <button id="btn-remove-photo" class="btn-secondary btn-sm">Replace Photo</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 2: Webcam & 2-Phase Video Recording -->
+        <section class="capture-section-card">
+          <div class="section-card-title">
+            <span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+              Step 2 & 3: Live Verification Clips
+            </span>
+            <div style="display: flex; gap: 4px;">
+              <span id="liveness-status-badge" class="step-indicator-badge">Clip 1: Face</span>
+              <span id="doc-status-badge" class="step-indicator-badge">Clip 2: ID</span>
+            </div>
+          </div>
+
+          <!-- Video Viewport -->
+          <div class="webcam-viewport-box">
+            <video id="webcam-video" class="webcam-video" autoplay playsinline muted></video>
+            
+            <!-- Recording Overlay -->
+            <div id="recording-overlay" class="recording-overlay hidden">
+              <span class="rec-dot"></span>
+              <span id="rec-timer-text">REC 00:00</span>
+              <span id="rec-target-label" style="font-size: 0.72rem; font-weight: 600; opacity: 0.9; margin-left: 6px;"></span>
+            </div>
+
+            <!-- Codec Badge -->
+            <div id="codec-badge" class="codec-badge">Codec: auto</div>
+
+            <!-- Progress bar -->
+            <div id="rec-progress-bar" class="recording-progress-bar"></div>
+          </div>
+
+          <!-- Active Clip Indicator Tabs -->
+          <div class="clip-tab-group">
+            <button id="tab-liveness-clip" class="clip-tab-btn active">
+              1. Face Liveness Clip (~6s)
+            </button>
+            <button id="tab-doc-clip" class="clip-tab-btn">
+              2. Document Presentation Clip (~4s)
+            </button>
+          </div>
+
+          <!-- Video Controls -->
+          <div class="video-controls-row">
+            <button id="btn-start-record-liveness" class="btn-primary">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+              Record Face Clip (Phase 1)
+            </button>
+            <button id="btn-start-record-doc" class="btn-primary hidden">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+              Record ID Clip (Phase 2)
+            </button>
+            <button id="btn-stop-record" class="btn-danger hidden">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+              Stop Recording
+            </button>
+            <button id="btn-play-preview-liveness" class="btn-secondary hidden btn-sm">
+              Play Face Clip
+            </button>
+            <button id="btn-play-preview-doc" class="btn-secondary hidden btn-sm">
+              Play ID Clip
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- Submission Box -->
+      <section class="submission-card">
+        <div id="submit-idle-state" style="display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%;">
+          <p id="submit-validation-hint" class="submit-guidance">
+            Upload an ID card photo and record both live verification clips to enable submission.
+          </p>
+          <button id="btn-submit-verification" class="btn-primary btn-lg" disabled>
+            <span>Submit Verification to Issuer</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Submitting Pipeline Progress -->
+        <div id="submit-pipeline-state" class="pipeline-progress-box hidden">
+          <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); text-align: center; margin-bottom: 6px;">
+            Evaluating Verification Pipeline (CPU Inference)...
+          </div>
+
+          <div id="pipe-upload" class="pipeline-step active">
+            <span class="pipeline-step-icon">1</span>
+            <span>Uploading ID photo, face video, and document clip...</span>
+          </div>
+          <div id="pipe-passive" class="pipeline-step">
+            <span class="pipeline-step-icon">2</span>
+            <span>Running MiniFASNet passive anti-spoofing on face video...</span>
+          </div>
+          <div id="pipe-active" class="pipeline-step">
+            <span class="pipeline-step-icon">3</span>
+            <span>Validating dynamic challenge performance (head turn / speech)...</span>
+          </div>
+          <div id="pipe-ocr" class="pipeline-step">
+            <span class="pipeline-step-icon">4</span>
+            <span>Extracting birthdate from ID card photo via OCR...</span>
+          </div>
+          <div id="pipe-doc" class="pipeline-step">
+            <span class="pipeline-step-icon">5</span>
+            <span>Verifying physical document presence and soft DOB corroboration...</span>
+          </div>
+          <div id="pipe-sign" class="pipeline-step">
+            <span class="pipeline-step-icon">6</span>
+            <span>Issuing cryptographic EdDSA-Poseidon credential signature...</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- SCREEN 3: RESULT SCREEN -->
+    <main id="screen-result" class="card hidden">
+      <!-- SUCCESS CONTAINER -->
+      <div id="result-success-container" class="result-success-box hidden">
+        <div class="result-badge-success">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <polyline points="9 12 11 14 15 10"></polyline>
+          </svg>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <h2 class="result-title">Credential Issued Successfully</h2>
+          <p style="color: var(--text-secondary); font-size: 0.9rem;">
+            Your identity has been verified. The credential has been signed with the issuer's EdDSA key.
+          </p>
+        </div>
+
+        <!-- Credential Card -->
+        <div class="credential-display-card">
+          <div class="credential-card-header">
+            <span class="credential-schema-tag" id="cred-schema">schema: zkkyc-credential-v1</span>
+            <span class="credential-verified-tag">Cryptographically Signed</span>
+          </div>
+
+          <!-- Primary Readable Attributes -->
+          <div class="credential-primary-fields">
+            <div class="cred-field-box">
+              <span class="cred-field-label">Date of Birth (DOB)</span>
+              <span id="cred-dob-formatted" class="cred-field-value highlight-dob">YYYY-MM-DD</span>
+            </div>
+            <div class="cred-field-box">
+              <span class="cred-field-label">Issuer DID</span>
+              <span id="cred-issuer-id" class="cred-field-value subtext">did:zkkyc:issuer-1</span>
+            </div>
+            <div class="cred-field-box">
+              <span class="cred-field-label">Issued Timestamp</span>
+              <span id="cred-issued-at" class="cred-field-value subtext">--</span>
+            </div>
+          </div>
+
+          <!-- Cryptographic Material & Secret Witness -->
+          <div class="crypto-materials-section">
+            <div class="crypto-section-header">
+              <span class="crypto-section-title">Cryptographic Material & Secret Witness</span>
+              <span class="secret-warning-note">Keep holder_secret confidential</span>
+            </div>
+
+            <!-- Holder Secret (Masked) -->
+            <div class="crypto-item">
+              <div class="crypto-item-top">
+                <span class="crypto-item-label">Holder Secret (Private Witness for zk-SNARK)</span>
+                <button id="btn-toggle-secret" class="btn-secret-toggle" type="button">
+                  Show secret
+                </button>
+              </div>
+              <div id="cred-holder-secret" class="crypto-item-value secret-masked">
+                ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+              </div>
+            </div>
+
+            <!-- Issuer Public Key -->
+            <div class="crypto-item">
+              <div class="crypto-item-top">
+                <span class="crypto-item-label">Issuer Public Key (ax, ay)</span>
+              </div>
+              <div id="cred-issuer-pub" class="crypto-item-value">
+                ax: ... | ay: ...
+              </div>
+            </div>
+
+            <!-- Signature -->
+            <div class="crypto-item">
+              <div class="crypto-item-top">
+                <span class="crypto-item-label">EdDSA Signature (R8x, R8y, S)</span>
+              </div>
+              <div id="cred-sig" class="crypto-item-value">
+                R8x: ... | R8y: ... | S: ...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Download & Restart Actions -->
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+          <button id="btn-download-json" class="btn-secondary">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download credential.json</span>
+          </button>
+          <button id="btn-restart-success" class="btn-secondary">
+            Verify Another Identity
+          </button>
+        </div>
+
+        <!-- Interactive ZK Prover & Verifier Section -->
+        <div class="zk-prover-card">
+          <div class="zk-prover-header">
+            <div class="zk-prover-title">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2">
+                <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+                <path d="m9 12 2 2 4-4"></path>
+              </svg>
+              Zero-Knowledge Prover & Verifier
+            </div>
+            <span class="zk-prover-badge">PLONK SNARK Circuit</span>
+          </div>
+
+          <p class="zk-prover-desc">
+            Generate a zero-knowledge proof proving that you are <strong>18+ years old</strong> and hold a valid credential from the trusted issuer, without revealing your exact date of birth or secret witness.
+          </p>
+
+          <div class="zk-actions-row">
+            <button id="btn-generate-proof" class="btn-primary">
+              <span id="btn-generate-proof-spinner" class="btn-spinner hidden"></span>
+              <span id="btn-generate-proof-text">Generate Proof</span>
+            </button>
+            <button id="btn-verify-proof" class="btn-success hidden">
+              <span id="btn-verify-proof-spinner" class="btn-spinner hidden"></span>
+              <span id="btn-verify-proof-text">Verify Proof</span>
+            </button>
+            <button id="btn-download-proof" class="btn-secondary hidden">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Download proof.json</span>
+            </button>
+          </div>
+
+          <!-- Proving Progress / Status Box -->
+          <div id="proving-status-box" class="proving-status-box hidden">
+            <span class="btn-spinner"></span>
+            <span id="proving-status-text">Generating zero-knowledge proof (PLONK CPU inference)...</span>
+          </div>
+
+          <!-- Proof Result Box -->
+          <div id="proof-result-box" class="proof-display-box hidden">
+            <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary); display: flex; justify-content: space-between;">
+              <span>Public Signals & Commitment</span>
+              <span class="step-indicator-badge completed">Proof Generated</span>
+            </div>
+            <div class="proof-signals-grid">
+              <div class="proof-signal-item">
+                <span class="proof-signal-label">Issuer Public Key (ax, ay)</span>
+                <span id="proof-signal-axay" class="proof-signal-value">--</span>
+              </div>
+              <div class="proof-signal-item">
+                <span class="proof-signal-label">Cutoff Reference Date (refPacked)</span>
+                <span id="proof-signal-ref" class="proof-signal-value">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Verification Outcome Banner -->
+          <div id="verification-result-banner" class="verification-result-banner hidden">
+            <div id="verification-banner-icon"></div>
+            <div>
+              <div id="verification-banner-title" class="verification-result-title"></div>
+              <div id="verification-banner-desc" class="verification-result-desc"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAILURE CONTAINER -->
+      <div id="result-failure-container" class="result-failure-box hidden">
+        <div class="result-badge-error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+          </svg>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <h2 class="result-title">Verification Rejected</h2>
+          <p style="color: var(--text-secondary); font-size: 0.9rem;">
+            The issuer service could not validate your submission against its security policies.
+          </p>
+        </div>
+
+        <!-- Error Card -->
+        <div class="error-details-card">
+          <div>
+            <span class="cred-field-label">Failure Code:</span>
+            <div style="margin-top: 4px;">
+              <span id="err-code-badge" class="error-code-badge">UNKNOWN_ERROR</span>
+            </div>
+          </div>
+
+          <div>
+            <span class="cred-field-label">API Diagnostic Details:</span>
+            <pre id="err-details-dump" class="error-raw-dump" style="margin-top: 4px;">{ ... }</pre>
+          </div>
+
+          <div id="err-troubleshooting-box" class="troubleshoot-tip">
+            <strong>Guidance:</strong> <span id="err-troubleshooting-text">Please review the failure details above.</span>
+          </div>
+        </div>
+
+        <button id="btn-restart-error" class="btn-secondary">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"></polyline>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+          </svg>
+          <span>Try Again</span>
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
