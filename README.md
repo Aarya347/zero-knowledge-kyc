@@ -15,7 +15,7 @@ before relying on this for anything beyond learning/experimentation.
 
 ---
 
-## 1. What this actually proves, in one paragraph
+## 1. What this actually proves
 
 A person completes a one-time live verification session: they perform a
 liveness challenge (head-turn or spoken digits) in front of a webcam, then
